@@ -253,6 +253,15 @@ RUN echo "cgi.fix_pathinfo=0" > ${php_vars} &&\
 #    ln -s /etc/php7/php.ini /etc/php7/conf.d/php.ini && \
 #    find /etc/php7/conf.d/ -name "*.ini" -exec sed -i -re 's/^(\s*)#(.*)/\1;\2/g' {} \;
 
+RUN apk update && \
+    apk add bash git openssh rsync augeas && \
+    deluser $(getent passwd 33 | cut -d: -f1) && \
+    delgroup $(getent group 33 | cut -d: -f1) 2>/dev/null || true && \
+    mkdir -p ~root/.ssh /etc/authorized_keys && chmod 700 ~root/.ssh/ && \
+    augtool 'set /files/etc/ssh/sshd_config/AuthorizedKeysFile ".ssh/authorized_keys /etc/authorized_keys/%u"' && \
+    echo -e "Port 22\n" >> /etc/ssh/sshd_config && \
+    cp -a /etc/ssh /etc/ssh.cache && \
+    rm -rf /var/cache/apk/*
 
 # Add Scripts
 ADD scripts/start.sh /start.sh
@@ -267,6 +276,9 @@ ADD src/ /var/www/html/
 ADD errors/ /var/www/errors
 
 
-EXPOSE 443 80
+EXPOSE 443 80 22
+
+COPY entry.sh /entry.sh
 
 CMD ["/start.sh"]
+CMD ["/usr/sbin/sshd", "-D", "-f", "/etc/ssh/sshd_config"]
